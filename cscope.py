@@ -137,6 +137,34 @@ def getCurrentPosition(view):
     else:
         return None
 
+class CscopeDBSublimeWorker(threading.Thread):
+    def __init__(self, root, platform, executable):
+        super(CscopeDBSublimeWorker, self).__init__()
+        self.platform = platform
+        self.root = root
+        self.executable = executable
+
+    def run(self):
+        cscope_arg_list = [self.executable, '-b', '-q']
+        popen_arg_list = {
+            "shell": False,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "cwd": self.root
+        }
+        if (self.platform == "windows"):
+            popen_arg_list["creationflags"] = 0x08000000
+
+        try:
+            proc = subprocess.Popen(cscope_arg_list, **popen_arg_list)
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                sublime.error_message("Cscope ERROR: cscope binary \"%s\" not found!" % self.executable)
+            else:
+                sublime.error_message("Cscope ERROR: %s failed!" % cscope_arg_list)
+
+        output, erroroutput = proc.communicate()
+        print("cscope database is built")
 
 class CscopeSublimeWorker(threading.Thread):
     def __init__(self, view, platform, root, database, symbol, mode, executable):
@@ -339,6 +367,10 @@ class CscopeCommand(sublime_plugin.TextCommand):
                         print("Database found: ", self.database)
                         return
                     cdir = os.path.dirname(cdir)
+            # Select the Top most directory to build cscope database
+            self.root = cdir_list[0]
+            print(self.root)
+
 
     def update_status(self, workers, count=0, dir=1):
         count = count + dir
@@ -425,6 +457,42 @@ class CscopeCommand(sublime_plugin.TextCommand):
         self.workers.append(worker)
 
         self.update_status(self.workers)
+
+class BuildCscopeDatabaseCommand(sublime_plugin.TextCommand):
+    def __init__(self, view):
+        self.view = view
+        self.database = None
+        self.executable = None
+        self.root = None
+        settings = get_settings()
+
+    def update_database_location(self):
+        if get_setting("database_location", "") != "":
+            self.database = get_setting("database_location", "")
+            self.root = os.path.dirname(self.database)
+        else:
+
+            project_info = self.view.window().project_data()
+            cdir_list = [folder['path'] for folder in project_info['folders']]
+            
+            for cdir in cdir_list:
+                while cdir != os.path.dirname(cdir):
+                    if ("cscope.out" in os.listdir(cdir)):
+                        self.root = cdir
+                        self.database = os.path.join(cdir, "cscope.out")
+                        print("Database found: ", self.database)
+                        return 
+                    cdir = os.path.dirname(cdir)
+            # Select the Top most directory to build cscope database
+            self.root = cdir_list[0]
+            print(self.root)        
+
+    def run(self,edit):
+        self.executable = get_setting("executable", "cscope")
+
+        self.update_database_location()
+        worker = CscopeDBSublimeWorker(self.root, sublime.platform(), self.executable)
+        worker.run()
 
 class DisplayCscopeResultsCommand(sublime_plugin.TextCommand):
 

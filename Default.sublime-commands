@@ -38,5 +38,9 @@
     "caption": "Cscope: Find files #including a file",
     "command": "cscope",
     "args": { "mode": 8 }
+  },
+  {
+    "caption": "Cscope: Build Database",
+    "command": "build_cscope_database",
   }
 ]
