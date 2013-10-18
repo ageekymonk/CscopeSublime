@@ -367,10 +367,6 @@ class CscopeCommand(sublime_plugin.TextCommand):
                         print("Database found: ", self.database)
                         return
                     cdir = os.path.dirname(cdir)
-            # Select the Top most directory to build cscope database
-            self.root = cdir_list[0]
-            print(self.root)
-
 
     def update_status(self, workers, count=0, dir=1):
         count = count + dir
@@ -483,9 +479,9 @@ class BuildCscopeDatabaseCommand(sublime_plugin.TextCommand):
                         print("Database found: ", self.database)
                         return 
                     cdir = os.path.dirname(cdir)
-            # Select the Top most directory to build cscope database
-            self.root = cdir_list[0]
-            print(self.root)        
+            
+            if self.root is None:
+                sublime.error_message("Cscope Database Not found: Build your cscope db first. Successive updates can be done using this command")
 
     def run(self,edit):
         self.executable = get_setting("executable", "cscope")
